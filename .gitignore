@@ -1,0 +1,24 @@
+# Raw data should not be committed
+data/raw/*
+# Keep the raw data folder structure
+!data/raw/.gitkeep
+# Processed data can be regenerated
+data/processed/*
+# Keep the processed data folder structure
+!data/processed/.gitkeep
+# Python cache files
+__pycache__/
+*.pyc
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+# Environment files
+.env
+.venv/
+venv/
+# System files
+.DS_Store
+Thumbs.db
+# Large model/output files
+*.pkl
+*.joblib
+*.h5
