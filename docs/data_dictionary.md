@@ -73,3 +73,42 @@ predictors of G3.
 If the project goal is early-warning prediction, G1 and G2 should be excluded
 because they may introduce target leakage. In that case, the model should use only
 information available early in the semester.
+
+## Target Variables
+This project uses two target variables: one for regression and one for
+classification.
+### Regression Target
+| Variable | Type | Description | Use |
+|---|---|---|---|
+| `G3` | Numeric | Final student grade | Regression target |
+`G3` is the original final grade variable. It is used when the goal is to predict
+the student's actual final grade.
+### Classification Target
+| Variable | Type | Description | Rule | Use |
+
+GSSRP 2026 - Kean University | Predicting Student Performance Using Machine Learning Session 8/48 - Week 1
+|---|---|---|---|---|
+| `passed` | Binary integer | Pass/fail outcome created from `G3` | `1` if `G3 >=
+10`, else `0` | Classification target |
+The `passed` variable is created from the final grade `G3`.
+The classification rule is:
+```python
+df["passed"] = (df["G3"] >= 10).astype(int)
+
+This means:
+Value Meaning
+1 Student passed
+0 Student did not pass
+Chosen Threshold
+The chosen threshold is:
+G3 >= 10
+Students with G3 >= 10 are labeled as passing.
+Students with G3 < 10 are labeled as not passing or at risk.
+Threshold Limitation
+One limitation of this threshold is that it creates a hard cutoff. For example, a student with G3 = 9 is
+labeled as not passing, while a student with G3 = 10 is labeled as passing, even though their
+performance may be very similar.
+Final Decision
+For the first version of the project, the G3 >= 10 threshold will be kept because it is simple,
+interpretable, and useful for creating a binary classification target. The limitation of the hard cutoff
+should be documented in the final report.
