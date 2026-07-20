@@ -87,3 +87,61 @@ def eval_reg(
             )
         ),
     }
+# ---------------------------------------------------------------------------
+# Session 24: Binary-classification evaluation helper
+# ---------------------------------------------------------------------------
+def eval_clf(y_true, y_pred, y_proba=None):
+    """
+    Evaluate binary-classification predictions.
+    The positive class is label 1, representing an at-risk student.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Actual binary class labels.
+    y_pred : array-like
+        Predicted binary class labels.
+    y_proba : array-like or None, default=None
+        Predicted probabilities for the positive class. When supplied,
+        ROC-AUC is included in the returned results.
+
+    Returns
+    -------
+    dict
+        Dictionary containing accuracy, precision, recall, F1 score,
+        and optional ROC-AUC.
+    """
+    from sklearn.metrics import (
+        accuracy_score,
+        f1_score,
+        precision_score,
+        recall_score,
+        roc_auc_score,
+    )
+
+    results = {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "precision": precision_score(
+            y_true,
+            y_pred,
+            zero_division=0,
+        ),
+        "recall": recall_score(
+            y_true,
+            y_pred,
+            zero_division=0,
+        ),
+        "f1": f1_score(
+            y_true,
+            y_pred,
+            zero_division=0,
+        ),
+    }
+
+    if y_proba is not None:
+        results["roc_auc"] = roc_auc_score(
+            y_true,
+            y_proba,
+        )
+
+    return results
