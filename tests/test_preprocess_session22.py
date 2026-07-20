@@ -8,7 +8,7 @@ SRC_DIRECTORY = PROJECT_ROOT / "src"
 if str(SRC_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SRC_DIRECTORY))
 
-from src.preprocess import split_modeling_scenarios
+from preprocess import split_modeling_scenarios
 
 def make_example_data():
     index = pd.Index(range(100, 120), name="student_id")
