@@ -1,16 +1,4 @@
-# STEP 1: Delete all old session26 scripts
-Remove-Item "C:\Users\yikib\student-performance-prediction-ml\automation\session26_github_deliverable.ps1" -Force -ErrorAction SilentlyContinue
-Remove-Item "C:\Users\yikib\student-performance-prediction-ml\automation\session26_fixed.ps1" -Force -ErrorAction SilentlyContinue
-Remove-Item "C:\Users\yikib\student-performance-prediction-ml\automation\session26_complete.ps1" -Force -ErrorAction SilentlyContinue
-
-Write-Host "✅ Old scripts deleted" -ForegroundColor Green
-Write-Host ""
-
-# STEP 2: Create the ONE script that works
-$ScriptPath = "C:\Users\yikib\student-performance-prediction-ml\automation\session26.ps1"
-
-$ScriptContent = @'
-# Session 26 - KNN and SVR with StandardScaler Pipelines
+﻿# Session 26 - KNN and SVR with StandardScaler Pipelines
 
 $ProjectRoot = "C:\Users\yikib\student-performance-prediction-ml"
 $NotebookPath = Join-Path $ProjectRoot "notebooks\04_regression_models.ipynb"
@@ -166,7 +154,7 @@ $Session26Cells = @(
             "# Verify`n",
             "assert len(comparison_df[comparison_df['Model'] == 'KNN']) == 1, 'Need exactly 1 KNN row'`n",
             "assert len(comparison_df[comparison_df['Model'] == 'SVR']) == 1, 'Need exactly 1 SVR row'`n",
-            "print('✅ Verified: exactly one KNN and one SVR row')`n"
+            "print('âœ… Verified: exactly one KNN and one SVR row')`n"
         )
     },
 
@@ -177,14 +165,14 @@ $Session26Cells = @(
             tags = @("session26")
         }
         source = @(
-            "## Session 26 Complete ✅`n",
+            "## Session 26 Complete âœ…`n",
             "`n",
-            "- KNN with StandardScaler pipeline ✅`n",
-            "- SVR with StandardScaler pipeline ✅`n",
-            "- Both use Xtr_f and Xte_f ✅`n",
-            "- Both evaluated with eval_reg ✅`n",
-            "- comparison_df has exactly one KNN row ✅`n",
-            "- comparison_df has exactly one SVR row ✅`n"
+            "- KNN with StandardScaler pipeline âœ…`n",
+            "- SVR with StandardScaler pipeline âœ…`n",
+            "- Both use Xtr_f and Xte_f âœ…`n",
+            "- Both evaluated with eval_reg âœ…`n",
+            "- comparison_df has exactly one KNN row âœ…`n",
+            "- comparison_df has exactly one SVR row âœ…`n"
         )
     }
 )
@@ -192,7 +180,7 @@ $Session26Cells = @(
 $NotebookContent.cells = $CleanedCells + $Session26Cells
 $NotebookContent | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $NotebookPath -Encoding UTF8
 
-Write-Host "✅ Notebook updated with Session 26 content" -ForegroundColor Green
+Write-Host "âœ… Notebook updated with Session 26 content" -ForegroundColor Green
 Write-Host ""
 
 # Git operations
@@ -206,21 +194,11 @@ Write-Host "====================================================================
 Write-Host "SESSION 26 COMPLETE" -ForegroundColor Green
 Write-Host "=============================================================================="
 Write-Host ""
-Write-Host "✅ KNN with StandardScaler pipeline"
-Write-Host "✅ SVR with StandardScaler pipeline"
-Write-Host "✅ Both use Xtr_f and Xte_f"
-Write-Host "✅ Both evaluated with eval_reg"
-Write-Host "✅ comparison_df has exactly one KNN row"
-Write-Host "✅ comparison_df has exactly one SVR row"
-Write-Host "✅ Commit: Add KNN and SVR regression models"
+Write-Host "âœ… KNN with StandardScaler pipeline"
+Write-Host "âœ… SVR with StandardScaler pipeline"
+Write-Host "âœ… Both use Xtr_f and Xte_f"
+Write-Host "âœ… Both evaluated with eval_reg"
+Write-Host "âœ… comparison_df has exactly one KNN row"
+Write-Host "âœ… comparison_df has exactly one SVR row"
+Write-Host "âœ… Commit: Add KNN and SVR regression models"
 Write-Host ""
-'@
-
-# Save the script
-$ScriptContent | Set-Content -LiteralPath $ScriptPath -Encoding UTF8 -Force
-Write-Host "✅ Created: $ScriptPath" -ForegroundColor Green
-Write-Host ""
-
-# STEP 3: Run it!
-Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-& $ScriptPath
