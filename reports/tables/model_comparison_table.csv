@@ -1,0 +1,5 @@
+Session,Week,Task,Scenario,Feature Set,Target,Model,RMSE Rank,MAE,RMSE,R2
+25,3,Regression,Full-information,X_full,G3,Elastic Net,1,1.2555445903472295,2.0386828005218853,0.797307096793844
+25,3,Regression,Full-information,X_full,G3,Lasso,2,1.2180764342742354,2.0424421551599767,0.796558871450581
+25,3,Regression,Full-information,X_full,G3,Ridge,3,1.6353719773948039,2.369006310817141,0.7263019769073291
+25,3,Regression,Full-information,X_full,G3,Linear Regression,4,1.6466656197147518,2.3783697847961376,0.7241341236974019
