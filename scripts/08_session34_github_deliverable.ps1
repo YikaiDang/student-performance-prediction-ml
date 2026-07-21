@@ -1,13 +1,19 @@
+﻿[CmdletBinding()]
 param(
-    [string]$RepoPath = "C:\Users\yikib\student-performance-prediction-ml",
-    [string]$CommitMessage = "Extend classification notebook with KNN SVM and Naive Bayes"
+    [string]$ProjectPath = "C:\Users\yikib\student-performance-prediction-ml"
 )
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+$BranchName = "session-34-decision-tree-classifier"
+$CommitMessage = "Add Session 34 decision tree classifier"
+$ScriptName = "08_session34_github_deliverable.ps1"
 
 function Write-Step {
-    param([string]$Message)
+    param(
+        [string]$Message
+    )
     Write-Host ""
     Write-Host ("=" * 78)
     Write-Host $Message
@@ -15,39 +21,70 @@ function Write-Step {
 }
 
 function Assert-LastCommandSucceeded {
-    param([string]$FailureMessage)
+    param(
+        [string]$FailureMessage
+    )
     if ($LASTEXITCODE -ne 0) {
         throw "$FailureMessage Exit code: $LASTEXITCODE"
     }
 }
 
 function Invoke-GitPush {
-    param([string]$BranchName)
-    git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        git push
-        Assert-LastCommandSucceeded "Git push failed."
+    param(
+        [string]$BranchName
+    )
+    Write-Host "Attempting to push branch '$BranchName' to GitHub..."
+    Write-Host ""
+    
+    # Check if remote exists
+    $remoteUrl = git remote get-url origin 2>$null
+    if (-not $remoteUrl) {
+        throw "No remote 'origin' configured. Please run: git remote add origin <your-repo-url>"
     }
-    else {
-        git push -u origin $BranchName
-        Assert-LastCommandSucceeded "Git push with upstream configuration failed."
+    
+    Write-Host "Remote URL: $remoteUrl"
+    Write-Host ""
+    
+    # Try to push with upstream
+    Write-Host "Running: git push -u origin $BranchName"
+    $pushOutput = git push -u origin $BranchName 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Push failed with error:"
+        Write-Host $pushOutput -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Possible solutions:"
+        Write-Host "1. Make sure you have authentication set up:"
+        Write-Host "   - For HTTPS: git config --global credential.helper cache"
+        Write-Host "   - For SSH: Make sure your SSH key is added to GitHub"
+        Write-Host ""
+        Write-Host "2. Try pushing manually with:"
+        Write-Host "   git push -u origin $BranchName"
+        Write-Host ""
+        Write-Host "3. If using HTTPS with personal access token:"
+        Write-Host "   git remote set-url origin https://<username>:<token>@github.com/<username>/<repo>.git"
+        Write-Host ""
+        throw "Git push failed. Please fix authentication and try again."
     }
+    
+    Write-Host "Push successful!"
 }
 
-Write-Step "SESSION 33 GITHUB DELIVERABLE"
-Write-Host "Repository:"
-Write-Host $RepoPath
+Write-Step "SESSION 34 GITHUB DELIVERABLE"
+Write-Host "Project Path: $ProjectPath"
+Write-Host "Branch: $BranchName"
+Write-Host "Script: $ScriptName"
 
 # ---------------------------------------------------------------------------
 # 1. Validate the project folder
 # ---------------------------------------------------------------------------
 Write-Step "1. Validating the project repository"
 
-if (-not (Test-Path -LiteralPath $RepoPath)) {
-    throw "The project directory does not exist: $RepoPath"
+if (-not (Test-Path -LiteralPath $ProjectPath)) {
+    throw "The project directory does not exist: $ProjectPath"
 }
 
-Set-Location -LiteralPath $RepoPath
+Set-Location -LiteralPath $ProjectPath
 
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     throw "Git is not installed or is not available in PATH."
@@ -65,13 +102,32 @@ Write-Host "Git repository: verified"
 Write-Host "Origin remote: $OriginUrl"
 
 # ---------------------------------------------------------------------------
-# 2. Locate the classification notebook
+# 2. Create and switch to the session branch
 # ---------------------------------------------------------------------------
-Write-Step "2. Locating 05_classification_models.ipynb"
+Write-Step "2. Creating and switching to branch: $BranchName"
+
+# Check if branch exists locally
+$LocalBranchExists = git branch --list $BranchName
+if ($LocalBranchExists) {
+    Write-Host "Branch $BranchName already exists locally. Switching to it..."
+    git checkout $BranchName
+    Assert-LastCommandSucceeded "Failed to checkout existing branch."
+} else {
+    Write-Host "Creating new branch: $BranchName"
+    git checkout -b $BranchName
+    Assert-LastCommandSucceeded "Failed to create and checkout new branch."
+}
+
+Write-Host "Current branch: $BranchName"
+
+# ---------------------------------------------------------------------------
+# 3. Locate the classification notebook
+# ---------------------------------------------------------------------------
+Write-Step "3. Locating 05_classification_models.ipynb"
 
 $NotebookCandidates = @(
-    (Join-Path $RepoPath "05_classification_models.ipynb"),
-    (Join-Path $RepoPath "notebooks\05_classification_models.ipynb")
+    (Join-Path $ProjectPath "05_classification_models.ipynb"),
+    (Join-Path $ProjectPath "notebooks\05_classification_models.ipynb")
 )
 
 $NotebookPath = $null
@@ -83,7 +139,7 @@ foreach ($Candidate in $NotebookCandidates) {
 }
 
 if (-not $NotebookPath) {
-    $FoundNotebook = Get-ChildItem -LiteralPath $RepoPath -Filter "05_classification_models.ipynb" -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    $FoundNotebook = Get-ChildItem -LiteralPath $ProjectPath -Filter "05_classification_models.ipynb" -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($FoundNotebook) {
         $NotebookPath = $FoundNotebook.FullName
     }
@@ -94,18 +150,18 @@ if (-not $NotebookPath) {
 }
 
 $NotebookPath = (Resolve-Path -LiteralPath $NotebookPath).Path
-$NotebookRelativePath = $NotebookPath.Substring($RepoPath.Length + 1).Replace("\", "/")
+$NotebookRelativePath = $NotebookPath.Substring($ProjectPath.Length + 1).Replace("\", "/")
 
 Write-Host "Notebook found:"
 Write-Host $NotebookPath
 
 # ---------------------------------------------------------------------------
-# 3. Back up the existing notebook
+# 4. Back up the existing notebook
 # ---------------------------------------------------------------------------
-Write-Step "3. Creating a temporary notebook backup"
+Write-Step "4. Creating a temporary notebook backup"
 
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$BackupPath = Join-Path $env:TEMP "05_classification_models_before_session33_$Timestamp.ipynb"
+$BackupPath = Join-Path $env:TEMP "05_classification_models_before_session34_$Timestamp.ipynb"
 
 Copy-Item -LiteralPath $NotebookPath -Destination $BackupPath -Force
 
@@ -113,11 +169,11 @@ Write-Host "Temporary backup:"
 Write-Host $BackupPath
 
 # ---------------------------------------------------------------------------
-# 4. Select Python
+# 5. Select Python
 # ---------------------------------------------------------------------------
-Write-Step "4. Selecting the Python interpreter"
+Write-Step "5. Selecting the Python interpreter"
 
-$VenvPython = Join-Path $RepoPath ".venv\Scripts\python.exe"
+$VenvPython = Join-Path $ProjectPath ".venv\Scripts\python.exe"
 $PythonCommand = $null
 $PythonArguments = @()
 
@@ -139,14 +195,13 @@ Write-Host "Python command:"
 Write-Host $PythonCommand
 
 # ---------------------------------------------------------------------------
-# 5. Update the notebook using a simple Python script
+# 6. Add Decision Tree to the notebook
 # ---------------------------------------------------------------------------
-Write-Step "5. Extending the classification notebook"
+Write-Step "6. Adding Decision Tree classifier to the notebook"
 
-# Create a Python script file
-$UpdaterPath = Join-Path $env:TEMP "update_session33_notebook_$Timestamp.py"
+$UpdaterPath = Join-Path $env:TEMP "update_session34_notebook_$Timestamp.py"
 
-# Create the Python script using a different method - write each line
+# Create the Python script using an array to avoid quoting issues
 $pythonLines = @(
 'import json',
 'import sys',
@@ -154,7 +209,7 @@ $pythonLines = @(
 'from pathlib import Path',
 '',
 'if len(sys.argv) != 2:',
-'    raise SystemExit("Usage: update_session33_notebook.py <notebook>")',
+'    raise SystemExit("Usage: update_session34_notebook.py <notebook>")',
 '',
 'notebook_path = Path(sys.argv[1]).resolve()',
 'if not notebook_path.exists():',
@@ -168,12 +223,12 @@ $pythonLines = @(
 'notebook.setdefault("metadata", {})',
 'notebook.setdefault("cells", [])',
 '',
-'SESSION_TAG = "session33-github-deliverable"',
+'SESSION_TAG = "session34-github-deliverable"',
 '',
 'def has_tag(cell):',
 '    return SESSION_TAG in cell.get("metadata", {}).get("tags", [])',
 '',
-'# Remove old session33 cells',
+'# Remove old session34 cells',
 'preserved_cells = [c for c in notebook["cells"] if not has_tag(c)]',
 '',
 'def markdown_cell(text):',
@@ -181,7 +236,7 @@ $pythonLines = @(
 '',
 'def code_cell(text):',
 '    source = text.strip() + "\n"',
-'    compile(source, "<session33>", "exec")',
+'    compile(source, "<session34>", "exec")',
 '    return {"cell_type": "code", "execution_count": None, "metadata": {"tags": [SESSION_TAG]}, "outputs": [], "source": source}',
 '',
 '# Create the new cells',
@@ -189,29 +244,24 @@ $pythonLines = @(
 '',
 '# Markdown intro',
 'new_cells.append(markdown_cell("""',
-'## Session 33: KNN, SVM, and Naive Bayes Classification',
+'## Session 34: Decision Tree Classifier',
 '',
-'This section adds three classifiers: K-Nearest Neighbors, Support Vector Machine, and Gaussian Naive Bayes.',
-'All classifiers use the same training and test data with scaling for KNN and SVM.',
+'This section adds a Decision Tree classifier with different depths.',
 '"""))',
 '',
 '# Code cell 1 - Imports and validation',
 'new_cells.append(code_cell("""',
+'from sklearn.tree import DecisionTreeClassifier',
 'import numpy as np',
 'import pandas as pd',
 'from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score',
-'from sklearn.naive_bayes import GaussianNB',
-'from sklearn.neighbors import KNeighborsClassifier',
-'from sklearn.pipeline import make_pipeline',
-'from sklearn.preprocessing import StandardScaler',
-'from sklearn.svm import SVC',
 '',
 '# Verify prerequisites',
 'for obj in ["Xtr_f", "Xte_f", "yctr", "ycte"]:',
 '    if obj not in globals():',
 '        raise NameError(f"Missing required object: {obj}")',
 '',
-'print("Session 33 prerequisites verified")',
+'print("Session 34 prerequisites verified")',
 'print("Training shape:", Xtr_f.shape)',
 'print("Test shape:", Xte_f.shape)',
 '"""))',
@@ -229,57 +279,50 @@ $pythonLines = @(
 'print("Evaluator ready")',
 '"""))',
 '',
-'# Code cell 3 - Train models',
+'# Code cell 3 - Train Decision Tree with different depths',
 'new_cells.append(code_cell("""',
-'# Train KNN, SVM, and Gaussian Naive Bayes',
+'# Train Decision Tree with different depths',
+'depths = [3, 5, 7, 10, None]',
 'results = []',
-'for code, name, family, clf in [',
-'    ("KNN", "K-Nearest Neighbors", "Instance-based", KNeighborsClassifier()),',
-'    ("SVM", "Support Vector Machine", "Maximum-margin", SVC(probability=True, random_state=42)),',
-'    ("NB", "Gaussian Naive Bayes", "Probabilistic", GaussianNB()),',
-']:',
-'    pipeline = make_pipeline(StandardScaler(), clf)',
-'    pipeline.fit(Xtr_f, yctr)',
-'    predictions = pipeline.predict(Xte_f)',
-'    probabilities = pipeline.predict_proba(Xte_f)[:, 1]',
+'',
+'for depth in depths:',
+'    dt = DecisionTreeClassifier(max_depth=depth, random_state=42)',
+'    dt.fit(Xtr_f, yctr)',
+'    predictions = dt.predict(Xte_f)',
+'    probabilities = dt.predict_proba(Xte_f)[:, 1]',
 '    metrics = evaluate_classifier(ycte, predictions, probabilities)',
 '    results.append({',
-'        "Model": code,',
-'        "Full_Model_Name": name,',
-'        "Model_Family": family,',
-'        "Scaling_Used": True,',
+'        "Model": f"DT_depth_{depth if depth else "None"}",',
+'        "Max_Depth": depth,',
 '        **metrics',
 '    })',
-'    print(f"{code} completed - F1: {metrics["f1"]:.4f}")',
+'    print(f"DT depth {depth if depth else "None"} completed - F1: {metrics["f1"]:.4f}")',
 '',
 'results_df = pd.DataFrame(results).sort_values("f1", ascending=False).reset_index(drop=True)',
-'results_df.insert(0, "Session33_F1_Rank", range(1, len(results_df) + 1))',
-'',
-'print("\\nSession 33 Classification Results:")',
+'print("\\nDecision Tree Results:")',
 'print(results_df.to_string())',
 '"""))',
 '',
 '# Code cell 4 - Save results',
 'new_cells.append(code_cell("""',
-'# Save results to CSV',
+'# Save results',
 'from pathlib import Path',
 'repo_root = next((d for d in [Path.cwd(), *Path.cwd().parents] if (d / ".git").exists()), Path.cwd())',
 'output_dir = repo_root / "reports" / "tables"',
 'output_dir.mkdir(parents=True, exist_ok=True)',
 '',
-'results_df.to_csv(output_dir / "session33_classification_rows.csv", index=False)',
-'print("Results saved to:", output_dir / "session33_classification_rows.csv")',
+'results_df.to_csv(output_dir / "session34_decision_tree_results.csv", index=False)',
+'print("Results saved to:", output_dir / "session34_decision_tree_results.csv")',
 '"""))',
 '',
 '# Markdown interpretation',
 'new_cells.append(markdown_cell("""',
-'### Session 33 Interpretation',
+'### Session 34 Interpretation',
 '',
-'- **KNN** classifies based on similarity in scaled feature space',
-'- **SVM** finds a maximum-margin decision boundary',
-'- **Gaussian Naive Bayes** assumes conditional independence of predictors',
-'',
-'Naive Bayes provides a useful baseline even with the independence assumption.',
+'- **Decision Trees** split data based on feature values',
+'- Different depths test the trade-off between interpretability and performance',
+'- Shallower trees are more interpretable but may underfit',
+'- Deeper trees capture complex patterns but risk overfitting',
 '"""))',
 '',
 '# Update the notebook',
@@ -300,7 +343,7 @@ $pythonLines = @(
 '        tmp_path.unlink()',
 '',
 'print(f"Updated notebook: {notebook_path}")',
-'print(f"Added {len(new_cells)} Session 33 cells")'
+'print(f"Added {len(new_cells)} Session 34 cells")'
 )
 
 # Write the Python script
@@ -323,9 +366,9 @@ catch {
 Write-Host "Notebook update completed."
 
 # ---------------------------------------------------------------------------
-# 6. Validate the notebook
+# 7. Validate the notebook
 # ---------------------------------------------------------------------------
-Write-Step "6. Validating the updated notebook"
+Write-Step "7. Validating the updated notebook"
 
 $ValidationCode = @"
 import json
@@ -336,21 +379,21 @@ path = Path(sys.argv[1])
 with open(path, "r", encoding="utf-8") as f:
     notebook = json.load(f)
 
-tagged = [c for c in notebook.get("cells", []) if "session33-github-deliverable" in c.get("metadata", {}).get("tags", [])]
+tagged = [c for c in notebook.get("cells", []) if "session34-github-deliverable" in c.get("metadata", {}).get("tags", [])]
 
 if len(tagged) < 5:
-    raise AssertionError(f"Session 33 block incomplete. Found {len(tagged)} cells")
+    raise AssertionError(f"Session 34 block incomplete. Found {len(tagged)} cells")
 
 source = "".join("".join(c.get("source", [])) if isinstance(c.get("source", []), list) else str(c.get("source", "")) for c in tagged)
 
-for term in ["KNeighborsClassifier", "SVC", "GaussianNB", "StandardScaler"]:
+for term in ["DecisionTreeClassifier", "max_depth"]:
     if term not in source:
         raise AssertionError(f"Missing required content: {term}")
 
-print(f"Validation passed. Found {len(tagged)} Session 33 cells")
+print(f"Validation passed. Found {len(tagged)} Session 34 cells")
 "@
 
-$ValidationPath = Join-Path $env:TEMP "validate_session33_notebook_$Timestamp.py"
+$ValidationPath = Join-Path $env:TEMP "validate_session34_notebook_$Timestamp.py"
 
 Set-Content -LiteralPath $ValidationPath -Value $ValidationCode -Encoding UTF8
 
@@ -358,14 +401,14 @@ Set-Content -LiteralPath $ValidationPath -Value $ValidationCode -Encoding UTF8
 Assert-LastCommandSucceeded "Notebook validation failed."
 
 # ---------------------------------------------------------------------------
-# 7. Stage, commit, and push
+# 8. Stage and commit
 # ---------------------------------------------------------------------------
-Write-Step "7. Staging the notebook"
+Write-Step "8. Staging the notebook"
 
 git add -- $NotebookRelativePath
 Assert-LastCommandSucceeded "Git could not stage the notebook."
 
-Write-Step "8. Committing the notebook"
+Write-Step "9. Committing the notebook"
 
 git diff --cached --quiet -- $NotebookRelativePath
 if ($LASTEXITCODE -eq 1) {
@@ -376,30 +419,32 @@ if ($LASTEXITCODE -eq 1) {
     Write-Host "No changes to commit"
 }
 
-Write-Step "9. Pushing to GitHub"
+# ---------------------------------------------------------------------------
+# 10. Push to GitHub
+# ---------------------------------------------------------------------------
+Write-Step "10. Pushing to GitHub"
 
-$CurrentBranch = (git branch --show-current).Trim()
-Assert-LastCommandSucceeded "Unable to determine the current Git branch."
-
-if ([string]::IsNullOrWhiteSpace($CurrentBranch)) {
-    throw "Repository is in detached-HEAD mode."
-}
-
-Invoke-GitPush -BranchName $CurrentBranch
+# Call the push function with proper error handling
+Invoke-GitPush -BranchName $BranchName
 
 # ---------------------------------------------------------------------------
-# 10. Final verification
+# 11. Final verification
 # ---------------------------------------------------------------------------
-Write-Step "10. Final verification"
+Write-Step "11. Final verification"
 
 Write-Host ("=" * 78)
-Write-Host "SESSION 33 GITHUB DELIVERABLE COMPLETED SUCCESSFULLY"
+Write-Host "SESSION 34 GITHUB DELIVERABLE COMPLETED SUCCESSFULLY"
 Write-Host ("=" * 78)
 Write-Host "Notebook: $NotebookRelativePath"
-Write-Host "Branch: $CurrentBranch"
-Write-Host "KNN code: added"
-Write-Host "SVM code: added"
-Write-Host "Gaussian Naive Bayes code: added"
+Write-Host "Branch: $BranchName"
+Write-Host "Decision Tree code: added"
+Write-Host ""
+
+# Show the remote branch URL
+Write-Host "Remote branch URL:"
+$OriginUrl = git remote get-url origin
+$GitHubUrl = $OriginUrl -replace "\.git$", "" -replace "git@github\.com:", "https://github.com/"
+Write-Host "$GitHubUrl/tree/$BranchName"
 
 # Clean up
 Remove-Item -LiteralPath $UpdaterPath -Force -ErrorAction SilentlyContinue
