@@ -1,0 +1,8 @@
+﻿GSSRP 2026 — Session 28 GitHub Deliverable
+==========================================
+Completed: 2026-07-21 07:30:25
+Project: C:\Users\yikib\student-performance-prediction-ml
+Branch: main
+Remote: https://github.com/YikaiDang/student-performance-prediction-ml.git
+Regression notebook: notebooks\04_regression_models.ipynb
+Automation: scripts\complete_session28_github.ps1
