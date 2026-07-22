@@ -31,15 +31,10 @@ function Get-CompatibleRelativePath {
         [Parameter(Mandatory = $true)][string]$FullPath
     )
 
-    $NormalizedBase = [System.IO.Path]::GetFullPath($BasePath).TrimEnd(
-        [char[]]"\/"
-    ) + [System.IO.Path]::DirectorySeparatorChar
+    $NormalizedBase = [System.IO.Path]::GetFullPath($BasePath).TrimEnd([char[]]"\/") + [System.IO.Path]::DirectorySeparatorChar
     $NormalizedFull = [System.IO.Path]::GetFullPath($FullPath)
 
-    if (-not $NormalizedFull.StartsWith(
-        $NormalizedBase,
-        [System.StringComparison]::OrdinalIgnoreCase
-    )) {
+    if (-not $NormalizedFull.StartsWith($NormalizedBase, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Path is outside the project: $NormalizedFull"
     }
 
@@ -73,8 +68,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 $BlockingStatus = @(
     $OriginalStatus | Where-Object {
-        # The downloaded Session 37 automation is allowed in either the
-        # project root or scripts directory. All other changes remain protected.
         $_ -notmatch '^\?\? (scripts/)?08_session37_github_deliverable.*\.ps1$'
     }
 )
@@ -165,9 +158,7 @@ if (-not $Notebook) {
 }
 
 $NotebookPath = $Notebook.FullName
-$NotebookRelative = Get-CompatibleRelativePath `
-    -BasePath $ProjectRoot `
-    -FullPath $NotebookPath
+$NotebookRelative = Get-CompatibleRelativePath -BasePath $ProjectRoot -FullPath $NotebookPath
 $BackupPath = "$NotebookPath.session37-backup"
 Copy-Item -LiteralPath $NotebookPath -Destination $BackupPath -Force
 Write-Host "Notebook: $NotebookRelative"
@@ -225,7 +216,6 @@ def code(text):
 cells = []
 
 cells.append(markdown(r'''
-<!-- SESSION 37 AUTOMATION CELL -->
 # Session 37: Neural-Network Classification
 
 This section trains a scaled multilayer perceptron (MLP) classifier using the existing classification split. It adds exactly one **MLP Classifier** row to the classification leaderboard, compares the MLP with the boosting models, and evaluates stability across five random seeds.
@@ -443,7 +433,6 @@ print("At-risk F1 range:", round(mlp_seed_stability_s37["At-Risk F1"].max() - ml
 '''))
 
 cells.append(markdown(r'''
-<!-- SESSION 37 AUTOMATION CELL -->
 ### Session 37 reflection
 
 A neural network may be overfitting a small dataset when its training scores are substantially higher than its validation or test scores, training loss continues to fall while validation loss rises, or results change markedly across random seeds and cross-validation folds. Other warning signs include highly confident incorrect predictions, a large training-test F1 gap, convergence instability, and poorer unseen-data performance than simpler models such as logistic regression or boosting. These signs indicate that the network may be learning sample-specific noise rather than patterns that generalize to new students.
@@ -486,7 +475,7 @@ print("Classification table path:", classification_table_path_s37)
 print("MLP row path:", mlp_row_path_s37)
 print("Boosting comparison path:", comparison_path_s37)
 print("Seed stability path:", stability_path_s37)
-'''))
+''')
 
 notebook["cells"].extend(cells)
 
@@ -545,7 +534,7 @@ full_source = "\n".join(
 required = [
     "MLPClassifier", "hidden_layer_sizes=(64, 32)", "max_iter=1000",
     "random_state=42", "MLP Classifier", "At-Risk F1",
-    "session37_mlp_seed_stability.csv", "SESSION 37 OUTPUT ARTIFACT VERIFIED",
+    "session37_mlp_seed_stability.csv", "SESSION 37 AUTOMATION CELL",
 ]
 missing = [item for item in required if item not in full_source]
 if missing:
@@ -620,13 +609,9 @@ $StoredScriptFull = [System.IO.Path]::GetFullPath($StoredScript)
 if ($RunningScriptFull -ne $StoredScriptFull) {
     Copy-Item -LiteralPath $RunningScript -Destination $StoredScript -Force
 
-    # When the download is in the project root, remove that temporary copy.
-    # The permanent tracked copy is scripts\08_session37_github_deliverable.ps1.
     $RunningDirectory = [System.IO.Path]::GetDirectoryName($RunningScriptFull)
     if ($RunningDirectory -eq [System.IO.Path]::GetFullPath($ProjectRoot)) {
-        $TemporaryRootScriptRelative = Get-CompatibleRelativePath `
-            -BasePath $ProjectRoot `
-            -FullPath $RunningScriptFull
+        $TemporaryRootScriptRelative = Get-CompatibleRelativePath -BasePath $ProjectRoot -FullPath $RunningScriptFull
         Remove-Item -LiteralPath $RunningScriptFull -Force
     }
 }
