@@ -1,3 +1,8 @@
+# First, delete the old script
+Remove-Item "C:\Users\yikib\student-performance-prediction-ml\scripts\08_session33_github_deliverable.ps1" -Force -ErrorAction SilentlyContinue
+
+# Create the new script using a different method
+$scriptContent = @'
 param(
     [string]$RepoPath = "C:\Users\yikib\student-performance-prediction-ml",
     [string]$CommitMessage = "Extend classification notebook with KNN SVM and Naive Bayes"
@@ -94,6 +99,7 @@ if (-not $NotebookPath) {
 }
 
 $NotebookPath = (Resolve-Path -LiteralPath $NotebookPath).Path
+# Manual relative path - works on all PowerShell versions
 $NotebookRelativePath = $NotebookPath.Substring($RepoPath.Length + 1).Replace("\", "/")
 
 Write-Host "Notebook found:"
@@ -113,9 +119,164 @@ Write-Host "Temporary backup:"
 Write-Host $BackupPath
 
 # ---------------------------------------------------------------------------
-# 4. Select Python
+# 4. Create a temporary Python notebook updater
 # ---------------------------------------------------------------------------
-Write-Step "4. Selecting the Python interpreter"
+Write-Step "4. Creating the notebook update program"
+
+$UpdaterPath = Join-Path $env:TEMP "update_session33_notebook_$Timestamp.py"
+
+$PythonUpdater = @"
+import json
+import sys
+import tempfile
+from pathlib import Path
+
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: update_session33_notebook.py <notebook>")
+
+notebook_path = Path(sys.argv[1]).resolve()
+if not notebook_path.exists():
+    raise FileNotFoundError(f"Notebook not found: {notebook_path}")
+
+with open(notebook_path, "r", encoding="utf-8") as f:
+    notebook = json.load(f)
+
+notebook.setdefault("nbformat", 4)
+notebook.setdefault("nbformat_minor", 5)
+notebook.setdefault("metadata", {})
+notebook.setdefault("cells", [])
+
+SESSION_TAG = "session33-github-deliverable"
+
+def has_tag(cell):
+    return SESSION_TAG in cell.get("metadata", {}).get("tags", [])
+
+# Remove old session33 cells
+preserved_cells = [c for c in notebook["cells"] if not has_tag(c)]
+
+def markdown_cell(text):
+    return {"cell_type": "markdown", "metadata": {"tags": [SESSION_TAG]}, "source": text.strip() + "\n"}
+
+def code_cell(text):
+    source = text.strip() + "\n"
+    compile(source, "<session33>", "exec")
+    return {"cell_type": "code", "execution_count": None, "metadata": {"tags": [SESSION_TAG]}, "outputs": [], "source": source}
+
+session33_cells = [
+    markdown_cell("## Session 33: KNN, SVM, and Naive Bayes Classification"),
+    
+    code_cell("""
+import numpy as np
+import pandas as pd
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+
+# Verify prerequisites
+for obj in ["Xtr_f", "Xte_f", "yctr", "ycte"]:
+    if obj not in globals():
+        raise NameError(f"Missing required object: {obj}")
+
+print("Session 33 prerequisites verified")
+print("Training shape:", Xtr_f.shape)
+print("Test shape:", Xte_f.shape)
+"""),
+    
+    code_cell("""
+def evaluate_classifier(y_true, y_pred, y_prob):
+    return {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "precision": precision_score(y_true, y_pred, zero_division=0),
+        "recall": recall_score(y_true, y_pred, zero_division=0),
+        "f1": f1_score(y_true, y_pred, zero_division=0),
+        "roc_auc": roc_auc_score(y_true, y_prob) if len(np.unique(y_true)) == 2 else np.nan,
+    }
+print("Evaluator ready")
+"""),
+    
+    code_cell("""
+# Train KNN, SVM, and Gaussian Naive Bayes
+results = []
+for code, name, family, clf in [
+    ("KNN", "K-Nearest Neighbors", "Instance-based", KNeighborsClassifier()),
+    ("SVM", "Support Vector Machine", "Maximum-margin", SVC(probability=True, random_state=42)),
+    ("NB", "Gaussian Naive Bayes", "Probabilistic", GaussianNB()),
+]:
+    pipeline = make_pipeline(StandardScaler(), clf)
+    pipeline.fit(Xtr_f, yctr)
+    predictions = pipeline.predict(Xte_f)
+    probabilities = pipeline.predict_proba(Xte_f)[:, 1]
+    metrics = evaluate_classifier(ycte, predictions, probabilities)
+    results.append({
+        "Model": code,
+        "Full_Model_Name": name,
+        "Model_Family": family,
+        "Scaling_Used": True,
+        **metrics
+    })
+    print(f"{code} completed - F1: {metrics['f1']:.4f}")
+
+results_df = pd.DataFrame(results).sort_values("f1", ascending=False).reset_index(drop=True)
+results_df.insert(0, "Session33_F1_Rank", range(1, len(results_df) + 1))
+
+print("\nSession 33 Classification Results:")
+print(results_df.to_string())
+"""),
+    
+    code_cell("""
+# Save results
+from pathlib import Path
+repo_root = next((d for d in [Path.cwd(), *Path.cwd().parents] if (d / ".git").exists()), Path.cwd())
+output_dir = repo_root / "reports" / "tables"
+output_dir.mkdir(parents=True, exist_ok=True)
+
+results_df.to_csv(output_dir / "session33_classification_rows.csv", index=False)
+print("Results saved to:", output_dir / "session33_classification_rows.csv")
+"""),
+    
+    markdown_cell("""
+### Session 33 Interpretation
+
+- **KNN** assumes similar observations in scaled feature space share the same class
+- **SVM** finds a maximum-margin decision boundary
+- **Gaussian Naive Bayes** assumes conditional independence of predictors
+
+Naive Bayes provides a useful baseline even though independence may not hold perfectly.
+"""),
+]
+
+notebook["cells"] = preserved_cells + session33_cells
+
+# Write atomically
+fd, tmp = tempfile.mkstemp(suffix=".ipynb", dir=str(notebook_path.parent))
+import os
+os.close(fd)
+tmp_path = Path(tmp)
+try:
+    with open(tmp_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(notebook, f, indent=1, ensure_ascii=False)
+        f.write("\n")
+    tmp_path.replace(notebook_path)
+finally:
+    if tmp_path.exists():
+        tmp_path.unlink()
+
+print(f"Updated notebook: {notebook_path}")
+print(f"Added {len(session33_cells)} Session 33 cells")
+"@
+
+Set-Content -LiteralPath $UpdaterPath -Value $PythonUpdater -Encoding UTF8
+
+Write-Host "Notebook updater created:"
+Write-Host $UpdaterPath
+
+# ---------------------------------------------------------------------------
+# 5. Select Python
+# ---------------------------------------------------------------------------
+Write-Step "5. Selecting the Python interpreter"
 
 $VenvPython = Join-Path $RepoPath ".venv\Scripts\python.exe"
 $PythonCommand = $null
@@ -139,177 +300,10 @@ Write-Host "Python command:"
 Write-Host $PythonCommand
 
 # ---------------------------------------------------------------------------
-# 5. Update the notebook using a simple Python script
+# 6. Update the notebook
 # ---------------------------------------------------------------------------
-Write-Step "5. Extending the classification notebook"
+Write-Step "6. Extending the classification notebook"
 
-# Create a Python script file
-$UpdaterPath = Join-Path $env:TEMP "update_session33_notebook_$Timestamp.py"
-
-# Create the Python script using a different method - write each line
-$pythonLines = @(
-'import json',
-'import sys',
-'import tempfile',
-'from pathlib import Path',
-'',
-'if len(sys.argv) != 2:',
-'    raise SystemExit("Usage: update_session33_notebook.py <notebook>")',
-'',
-'notebook_path = Path(sys.argv[1]).resolve()',
-'if not notebook_path.exists():',
-'    raise FileNotFoundError(f"Notebook not found: {notebook_path}")',
-'',
-'with open(notebook_path, "r", encoding="utf-8") as f:',
-'    notebook = json.load(f)',
-'',
-'notebook.setdefault("nbformat", 4)',
-'notebook.setdefault("nbformat_minor", 5)',
-'notebook.setdefault("metadata", {})',
-'notebook.setdefault("cells", [])',
-'',
-'SESSION_TAG = "session33-github-deliverable"',
-'',
-'def has_tag(cell):',
-'    return SESSION_TAG in cell.get("metadata", {}).get("tags", [])',
-'',
-'# Remove old session33 cells',
-'preserved_cells = [c for c in notebook["cells"] if not has_tag(c)]',
-'',
-'def markdown_cell(text):',
-'    return {"cell_type": "markdown", "metadata": {"tags": [SESSION_TAG]}, "source": text.strip() + "\n"}',
-'',
-'def code_cell(text):',
-'    source = text.strip() + "\n"',
-'    compile(source, "<session33>", "exec")',
-'    return {"cell_type": "code", "execution_count": None, "metadata": {"tags": [SESSION_TAG]}, "outputs": [], "source": source}',
-'',
-'# Create the new cells',
-'new_cells = []',
-'',
-'# Markdown intro',
-'new_cells.append(markdown_cell("""',
-'## Session 33: KNN, SVM, and Naive Bayes Classification',
-'',
-'This section adds three classifiers: K-Nearest Neighbors, Support Vector Machine, and Gaussian Naive Bayes.',
-'All classifiers use the same training and test data with scaling for KNN and SVM.',
-'"""))',
-'',
-'# Code cell 1 - Imports and validation',
-'new_cells.append(code_cell("""',
-'import numpy as np',
-'import pandas as pd',
-'from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score',
-'from sklearn.naive_bayes import GaussianNB',
-'from sklearn.neighbors import KNeighborsClassifier',
-'from sklearn.pipeline import make_pipeline',
-'from sklearn.preprocessing import StandardScaler',
-'from sklearn.svm import SVC',
-'',
-'# Verify prerequisites',
-'for obj in ["Xtr_f", "Xte_f", "yctr", "ycte"]:',
-'    if obj not in globals():',
-'        raise NameError(f"Missing required object: {obj}")',
-'',
-'print("Session 33 prerequisites verified")',
-'print("Training shape:", Xtr_f.shape)',
-'print("Test shape:", Xte_f.shape)',
-'"""))',
-'',
-'# Code cell 2 - Evaluator function',
-'new_cells.append(code_cell("""',
-'def evaluate_classifier(y_true, y_pred, y_prob):',
-'    return {',
-'        "accuracy": accuracy_score(y_true, y_pred),',
-'        "precision": precision_score(y_true, y_pred, zero_division=0),',
-'        "recall": recall_score(y_true, y_pred, zero_division=0),',
-'        "f1": f1_score(y_true, y_pred, zero_division=0),',
-'        "roc_auc": roc_auc_score(y_true, y_prob) if len(np.unique(y_true)) == 2 else np.nan,',
-'    }',
-'print("Evaluator ready")',
-'"""))',
-'',
-'# Code cell 3 - Train models',
-'new_cells.append(code_cell("""',
-'# Train KNN, SVM, and Gaussian Naive Bayes',
-'results = []',
-'for code, name, family, clf in [',
-'    ("KNN", "K-Nearest Neighbors", "Instance-based", KNeighborsClassifier()),',
-'    ("SVM", "Support Vector Machine", "Maximum-margin", SVC(probability=True, random_state=42)),',
-'    ("NB", "Gaussian Naive Bayes", "Probabilistic", GaussianNB()),',
-']:',
-'    pipeline = make_pipeline(StandardScaler(), clf)',
-'    pipeline.fit(Xtr_f, yctr)',
-'    predictions = pipeline.predict(Xte_f)',
-'    probabilities = pipeline.predict_proba(Xte_f)[:, 1]',
-'    metrics = evaluate_classifier(ycte, predictions, probabilities)',
-'    results.append({',
-'        "Model": code,',
-'        "Full_Model_Name": name,',
-'        "Model_Family": family,',
-'        "Scaling_Used": True,',
-'        **metrics',
-'    })',
-'    print(f"{code} completed - F1: {metrics["f1"]:.4f}")',
-'',
-'results_df = pd.DataFrame(results).sort_values("f1", ascending=False).reset_index(drop=True)',
-'results_df.insert(0, "Session33_F1_Rank", range(1, len(results_df) + 1))',
-'',
-'print("\\nSession 33 Classification Results:")',
-'print(results_df.to_string())',
-'"""))',
-'',
-'# Code cell 4 - Save results',
-'new_cells.append(code_cell("""',
-'# Save results to CSV',
-'from pathlib import Path',
-'repo_root = next((d for d in [Path.cwd(), *Path.cwd().parents] if (d / ".git").exists()), Path.cwd())',
-'output_dir = repo_root / "reports" / "tables"',
-'output_dir.mkdir(parents=True, exist_ok=True)',
-'',
-'results_df.to_csv(output_dir / "session33_classification_rows.csv", index=False)',
-'print("Results saved to:", output_dir / "session33_classification_rows.csv")',
-'"""))',
-'',
-'# Markdown interpretation',
-'new_cells.append(markdown_cell("""',
-'### Session 33 Interpretation',
-'',
-'- **KNN** classifies based on similarity in scaled feature space',
-'- **SVM** finds a maximum-margin decision boundary',
-'- **Gaussian Naive Bayes** assumes conditional independence of predictors',
-'',
-'Naive Bayes provides a useful baseline even with the independence assumption.',
-'"""))',
-'',
-'# Update the notebook',
-'notebook["cells"] = preserved_cells + new_cells',
-'',
-'# Write atomically',
-'fd, tmp = tempfile.mkstemp(suffix=".ipynb", dir=str(notebook_path.parent))',
-'import os',
-'os.close(fd)',
-'tmp_path = Path(tmp)',
-'try:',
-'    with open(tmp_path, "w", encoding="utf-8", newline="\n") as f:',
-'        json.dump(notebook, f, indent=1, ensure_ascii=False)',
-'        f.write("\n")',
-'    tmp_path.replace(notebook_path)',
-'finally:',
-'    if tmp_path.exists():',
-'        tmp_path.unlink()',
-'',
-'print(f"Updated notebook: {notebook_path}")',
-'print(f"Added {len(new_cells)} Session 33 cells")'
-)
-
-# Write the Python script
-$pythonLines | Out-File -FilePath $UpdaterPath -Encoding UTF8 -Force
-
-Write-Host "Notebook updater created:"
-Write-Host $UpdaterPath
-
-# Run the Python script
 try {
     & $PythonCommand @PythonArguments $UpdaterPath $NotebookPath
     Assert-LastCommandSucceeded "The notebook update program failed."
@@ -323,9 +317,9 @@ catch {
 Write-Host "Notebook update completed."
 
 # ---------------------------------------------------------------------------
-# 6. Validate the notebook
+# 7. Validate the notebook
 # ---------------------------------------------------------------------------
-Write-Step "6. Validating the updated notebook"
+Write-Step "7. Validating the updated notebook"
 
 $ValidationCode = @"
 import json
@@ -358,14 +352,14 @@ Set-Content -LiteralPath $ValidationPath -Value $ValidationCode -Encoding UTF8
 Assert-LastCommandSucceeded "Notebook validation failed."
 
 # ---------------------------------------------------------------------------
-# 7. Stage, commit, and push
+# 8. Stage, commit, and push
 # ---------------------------------------------------------------------------
-Write-Step "7. Staging the notebook"
+Write-Step "8. Staging the notebook"
 
 git add -- $NotebookRelativePath
 Assert-LastCommandSucceeded "Git could not stage the notebook."
 
-Write-Step "8. Committing the notebook"
+Write-Step "9. Committing the notebook"
 
 git diff --cached --quiet -- $NotebookRelativePath
 if ($LASTEXITCODE -eq 1) {
@@ -376,7 +370,7 @@ if ($LASTEXITCODE -eq 1) {
     Write-Host "No changes to commit"
 }
 
-Write-Step "9. Pushing to GitHub"
+Write-Step "10. Pushing to GitHub"
 
 $CurrentBranch = (git branch --show-current).Trim()
 Assert-LastCommandSucceeded "Unable to determine the current Git branch."
@@ -388,9 +382,9 @@ if ([string]::IsNullOrWhiteSpace($CurrentBranch)) {
 Invoke-GitPush -BranchName $CurrentBranch
 
 # ---------------------------------------------------------------------------
-# 10. Final verification
+# 11. Final verification
 # ---------------------------------------------------------------------------
-Write-Step "10. Final verification"
+Write-Step "11. Final verification"
 
 Write-Host ("=" * 78)
 Write-Host "SESSION 33 GITHUB DELIVERABLE COMPLETED SUCCESSFULLY"
@@ -404,3 +398,10 @@ Write-Host "Gaussian Naive Bayes code: added"
 # Clean up
 Remove-Item -LiteralPath $UpdaterPath -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath $ValidationPath -Force -ErrorAction SilentlyContinue
+'@
+
+# Write the script to file
+$scriptContent | Out-File -FilePath "C:\Users\yikib\student-performance-prediction-ml\scripts\08_session33_github_deliverable.ps1" -Encoding UTF8 -Force
+
+Write-Host "Script created successfully!" -ForegroundColor Green
+Write-Host "Now run: cd C:\Users\yikib\student-performance-prediction-ml\scripts ; .\08_session33_github_deliverable.ps1" -ForegroundColor Yellow
